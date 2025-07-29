@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:6-alpine
+    container_name: giggle-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api:
+    build: .
+    container_name: giggle-api
+    ports:
+      - "5000:5000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - FLASK_ENV=development
+      - FLASK_DEBUG=true
+      - WHISPER_MODEL=base
+      - WHISPER_DEVICE=cpu
+      - UPLOAD_FOLDER=/app/data/uploads
+      - OUTPUT_FOLDER=/app/data/output
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  worker:
+    build: .
+    container_name: giggle-worker
+    command: python worker.py
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - WHISPER_MODEL=base
+      - WHISPER_DEVICE=cpu
+      - UPLOAD_FOLDER=/app/data/uploads
+      - OUTPUT_FOLDER=/app/data/output
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  monitor:
+    build: .
+    container_name: giggle-monitor
+    command: python monitor.py
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - PROMETHEUS_PORT=9090
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - api
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local 

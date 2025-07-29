@@ -1,0 +1,8 @@
+{
+  "title": "Hello World",
+  "content": "Welcome to Giggle Academy! This is a sample educational content for children.",
+  "language": "en",
+  "category": "education",
+  "difficulty": "beginner",
+  "tags": ["greeting", "introduction", "children"]
+} 
